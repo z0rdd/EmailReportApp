@@ -6,6 +6,7 @@ from openpyxl import Workbook
 
 database = Database()
 
+
 class App:
 
     def __init__(self):
@@ -19,41 +20,30 @@ class App:
         self.export_list = []
         self.resolved_name_ind = ["solv", "SOLV", "ompleted", "OMPLETED", "RAITEE", "raitee", "ompletado", "OMPLETADO"]
         self.folder_string = "        // Total:[{}], Unread:[{}], Read:[{}], Modified Today: [{}]"
+        self.intro_string = "*********** \n *{}* \n ***********"
         self.received_today = 0
         self.resolved_today = 0
         self.start_menu()
 
     def start_menu(self):
-        self.index_list = []
-        choices = ["List mailboxes", "Enter mailbox name", "Exit"]
-        print("***********")
-        print("*MAIN MENU*")
-        print("***********")
-        for ind, itm in enumerate(choices):
-            print("[", ind, "]", itm)
-            self.index_list.append(ind)
-        self.start_menu_choice()
-
-    def start_menu_choice(self):
-        chosen_choice = None
+        desc = "MAIN MENU"
+        print(self.intro_string.format(desc))
+        choices = {"List mailboxes": self.list_mailboxes, "Enter mailbox name": self.enter_mailbox, "Exit": exit}
+        index_dict = {}
+        for index, key in enumerate(choices):
+            index_dict[index] = key
+            print("[", index, "] ", key)
         try:
             chosen_choice = int(input("Your choice: "))
+            choices[index_dict[chosen_choice]]()
         except ValueError:
+            print("Wrong choice!")
             self.start_menu()
-        if chosen_choice not in self.index_list:
-            print("wrong choice:")
-            self.start_menu()
-        elif chosen_choice == 0:
-            self.list_mailboxes()
-        elif chosen_choice == 1:
-            self.enter_mailbox()
-        elif chosen_choice == 2:
-            exit()
 
     def enter_mailbox(self):
         chosen_mailbox = input("Enter mailbox name: ")
         self.export_list.clear()
-        headings_list = ["No.", "Folder Name", "Total Items", "Read", "Modified Today"]
+        headings_list = ["No.", "Folder Name", "Total Items", "UnRead", "Read", "Modified Today"]
         self.export_list.append(headings_list)
         try:
             self.fldrs = self.box(chosen_mailbox).Folders
@@ -75,28 +65,22 @@ class App:
             print(exp_slist[1], self.folder_string.format(exp_slist[2], exp_slist[3], exp_slist[4], exp_slist[5]))
             self.export_list.append(exp_slist)
             self.received_today += self.folder_stats(inb)
-
             self.inspect_folder(inb, 1)
+            self.print_block(sent_today)
 
-            print("")
-            print("")
-            print("Today's stats:")
-            print("Emails received today: ", self.received_today)
-            print("Emails sent today: ", sent_today)
-            print("Emails resolved today: ", self.resolved_today)
             n = datetime.now()
             database.insert(self.box(chosen_mailbox).Name, self.received_today, sent_today, self.resolved_today,
                             n.year, n.month, n.day, n.isocalendar()[1])
             self.enter_mailbox_menu()
+
         except com_error:
-            print("")
-            print("")
-            print("ERROR! Wrong/unavailable mailbox name! If the mailbox name is correct, please restart outlook!")
-            print("")
-            print("")
+            self.error_print_block()
             self.enter_mailbox_menu()
 
     def inspect_folder(self, folder, level):
+
+        """ loop through all the sub folders of the outlook folder passed as the parameter and check the metrics"""
+
         folder_string = "        // Total:[{}], Unread:[{}], Read:[{}], Modified Today: [{}]"
         es = "    "
         def_str = "{} [{}] {} {}"
@@ -117,7 +101,13 @@ class App:
 
             self.inspect_folder(item, level+1)  # circular reference to create infinite loop
 
-
+    def print_block(self, sent):
+        print("")
+        print("")
+        print("Today's stats:")
+        print("Emails received today: ", self.received_today)
+        print("Emails sent today: ", sent)
+        print("Emails resolved today: ", self.resolved_today)
 
     def list_mailboxes(self):
         for ind, folder in enumerate(self.box):
@@ -126,25 +116,27 @@ class App:
         self.start_menu()
 
     def enter_mailbox_menu(self):
-        submenu_choices = ['Reports', 'To Excel', 'Main Menu']
-        print("***********")
-        print("*MAILBOX MENU*")
-        print("***********")
-        index_list = []
-        for ind, itm in enumerate(submenu_choices):
-            print("[", ind, "]", itm)
-            index_list.append(ind)
-        choice = None
-        choice = int(input("Your choice: "))
-
-        if choice not in index_list:
+        desc = "MAILBOX MENU"
+        print(self.intro_string.format(desc))
+        choices = {'Reports': self.view_all, 'To Excel': self.to_excel, 'Main Menu': self.start_menu}
+        index_dict = {}
+        for index, key in enumerate(choices):
+            index_dict[index] = key
+            print("[", index, "] ", key)
+        try:
+            chosen_choice = int(input("Your choice: "))
+            choices[index_dict[chosen_choice]]()
+        except ValueError:
+            print("Wrong choice!")
             self.enter_mailbox_menu()
-        elif choice == 0:
-            self.view_all()
-        elif choice == 1:
-            self.to_excel()
-        elif choice == 2:
-            self.start_menu()
+
+    @staticmethod
+    def error_print_block():
+        print("")
+        print("")
+        print("ERROR! Wrong/unavailable mailbox name! If the mailbox name is correct, please restart outlook!")
+        print("")
+        print("")
 
     @staticmethod
     def count_items(ol_item):
@@ -191,6 +183,7 @@ class App:
             for subindex, subitem in enumerate(item):
                 ws.cell(row=index+1, column=subindex+1).value = subitem
                 wb.save("export.xlsx")
+        print("DONE!")
         self.enter_mailbox_menu()
 
 
